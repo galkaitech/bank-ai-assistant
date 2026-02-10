@@ -1,0 +1,78 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+.installed.cfg
+lib/
+lib64/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.env.local
+
+# Environment files (contains API keys — never commit)
+.env
+.env.production
+.env.staging
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Testing & coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+
+# Logs
+logs/
+*.log
+*.jsonl
+!logs/.gitkeep
+
+# Data — do not commit actual banking documents or vector stores
+data/chroma_db/
+data/sample_docs/*.pdf
+data/sample_docs/*.docx
+# Keep the directory structure
+!data/sample_docs/.gitkeep
+!data/mock_reports/.gitkeep
+
+# Jupyter Notebooks checkpoints
+.ipynb_checkpoints
+notebooks/.ipynb_checkpoints
+
+# Docker volumes
+docker/volumes/
+
+# Distribution
+*.tar.gz
+*.zip

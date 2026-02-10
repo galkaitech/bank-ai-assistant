@@ -1,0 +1,1 @@
+"""BankMind configuration package."""
