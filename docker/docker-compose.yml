@@ -1,0 +1,122 @@
+# ---------------------------------------------------------------------------
+# BankMind — Docker Compose Configuration
+# ---------------------------------------------------------------------------
+# This file defines the local development / demo environment.
+# Production deployments should use Kubernetes manifests or a managed
+# container platform (Azure Container Apps, AWS ECS, etc.).
+#
+# Services:
+#   app       — The BankMind FastAPI application
+#   chromadb  — ChromaDB vector store (persistent document index)
+#
+# Usage:
+#   Start all services:    docker-compose up --build
+#   Stop and remove:       docker-compose down
+#   View logs:             docker-compose logs -f app
+#   Rebuild app only:      docker-compose up --build app
+# ---------------------------------------------------------------------------
+
+version: "3.9"
+
+services:
+
+  # --------------------------------------------------------------------------
+  # BankMind API Application
+  # --------------------------------------------------------------------------
+  app:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    image: bankmind-api:latest
+    container_name: bankmind-app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      # Application mode
+      - APP_MODE=development
+      - LOG_LEVEL=INFO
+
+      # LLM configuration (loaded from .env file or set here)
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - LLM_MODEL=gpt-4o
+      - LLM_MODEL_DOC_QA=gpt-4o-mini
+
+      # Vector store — points to the chromadb service defined below
+      - VECTOR_STORE_TYPE=chroma
+      - CHROMA_PERSIST_DIR=/app/data/chroma_db
+
+      # Security
+      - ENABLE_PII_FILTER=true
+      - ENABLE_AUDIT_LOGGING=true
+    volumes:
+      # Mount host directories for development hot-reload (code changes reflect immediately)
+      - ../src:/app/src:ro
+      - ../config:/app/config:ro
+      # Persist vector store data across container restarts
+      - bankmind-chroma-data:/app/data/chroma_db
+      # Persist audit logs
+      - bankmind-logs:/app/logs
+    depends_on:
+      chromadb:
+        condition: service_healthy
+    networks:
+      - bankmind-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # --------------------------------------------------------------------------
+  # ChromaDB Vector Store
+  # --------------------------------------------------------------------------
+  # Runs as a separate service so the vector store can be shared across
+  # multiple app instances (for horizontal scaling) and so the index
+  # survives app container restarts.
+  #
+  # In production, consider:
+  # - Pinecone (fully managed, no infrastructure to maintain)
+  # - pgvector (if you already have PostgreSQL in your infrastructure)
+  # --------------------------------------------------------------------------
+  chromadb:
+    image: chromadb/chroma:0.5.5
+    container_name: bankmind-chromadb
+    restart: unless-stopped
+    ports:
+      - "8001:8000"   # ChromaDB's internal port is 8000; mapped to 8001 on host
+    environment:
+      - CHROMA_SERVER_HTTP_PORT=8000
+      - ANONYMIZED_TELEMETRY=false   # Disable telemetry in banking environments
+    volumes:
+      - bankmind-chroma-data:/chroma/chroma
+    networks:
+      - bankmind-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+# ---------------------------------------------------------------------------
+# Named volumes — data persists across docker-compose down/up cycles
+# Use 'docker-compose down -v' to also delete volumes (full reset)
+# ---------------------------------------------------------------------------
+volumes:
+  bankmind-chroma-data:
+    driver: local
+    name: bankmind-chroma-data
+  bankmind-logs:
+    driver: local
+    name: bankmind-logs
+
+# ---------------------------------------------------------------------------
+# Network isolation — services communicate internally but are not exposed
+# to other containers on the host unless explicitly mapped
+# ---------------------------------------------------------------------------
+networks:
+  bankmind-network:
+    driver: bridge
+    name: bankmind-network
